@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Meet Frame Extractor</title>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            width: 250px;
+            padding: 15px;
+            background-color: #f7f7f7;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+        h1 {
+            font-size: 1.2em;
+            color: #333;
+            margin-bottom: 15px;
+            text-align: center;
+        }
+        button {
+            width: 100%;
+            padding: 10px 15px;
+            margin-bottom: 10px;
+            border: none;
+            border-radius: 6px;
+            font-size: 1em;
+            cursor: pointer;
+            transition: background-color 0.2s ease, transform 0.1s ease;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+        #startButton {
+            background-color: #4CAF50; /* Green */
+            color: white;
+        }
+        #startButton:hover {
+            background-color: #45a049;
+            transform: translateY(-1px);
+        }
+        #stopButton {
+            background-color: #f44336; /* Red */
+            color: white;
+        }
+        #stopButton:hover {
+            background-color: #da190b;
+            transform: translateY(-1px);
+        }
+        #status {
+            margin-top: 15px;
+            font-size: 0.9em;
+            color: #555;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <h1>Meet Frame Extractor</h1>
+    <button id="startButton">Start Extraction</button>
+    <button id="stopButton">Stop Extraction</button>
+    <div id="status">Status: Idle</div>
+    <script src="popup.js"></script>
+</body>
+</html>
