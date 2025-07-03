@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Google Meet Participant Frames</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f0f2f5;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start; /* Align to top */
+            min-height: 100vh;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+        .container {
+            background-color: #ffffff;
+            border-radius: 12px;
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.1);
+            padding: 30px;
+            width: 100%;
+            max-width: 1200px;
+            text-align: center;
+        }
+        h1 {
+            color: #2c3e50;
+            margin-bottom: 25px;
+            font-size: 2.2em;
+            font-weight: 700;
+        }
+        #frames-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); /* Responsive grid */
+            gap: 20px;
+            justify-content: center;
+            align-items: start;
+        }
+        .participant-card {
+            background-color: #ecf0f1;
+            border-radius: 10px;
+            padding: 15px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            overflow: hidden; /* Ensure image doesn't overflow */
+        }
+        .participant-card img {
+            width: 100%;
+            height: auto;
+            max-height: 200px; /* Limit height to keep cards consistent */
+            object-fit: contain; /* Ensure the entire image is visible */
+            border-radius: 8px;
+            border: 2px solid #bdc3c7;
+            background-color: #fff;
+        }
+        .participant-card p {
+            margin-top: 10px;
+            font-weight: 600;
+            color: #34495e;
+            font-size: 1.1em;
+            word-break: break-all; /* Break long IDs/names */
+        }
+        .message-box {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: #333;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+            z-index: 1000;
+            opacity: 0;
+            transition: opacity 0.3s ease-in-out;
+        }
+        .message-box.show {
+            opacity: 1;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Google Meet Participant Frames Viewer</h1>
+        <div id="frames-grid">
+            <!-- Participant frames will be displayed here -->
+            <p id="no-frames-message" class="text-gray-500 text-lg mt-10">
+                Waiting for frames from the Chrome extension...
+                <br>
+                Please ensure the Flask server is running and the extension is active on a Google Meet call.
+            </p>
+        </div>
+    </div>
+
+    <div id="messageBox" class="message-box"></div>
+
+    <script>
+        const framesGrid = document.getElementById('frames-grid');
+        const noFramesMessage = document.getElementById('no-frames-message');
+        const messageBox = document.getElementById('messageBox');
+
+        // Function to show a temporary message
+        function showMessage(message, duration = 3000) {
+            messageBox.textContent = message;
+            messageBox.classList.add('show');
+            setTimeout(() => {
+                messageBox.classList.remove('show');
+            }, duration);
+        }
+
+        // Establish Server-Sent Events (SSE) connection
+        const eventSource = new EventSource('/stream_frames');
+
+        eventSource.onopen = function(event) {
+            console.log('SSE connection opened.');
+            showMessage('Connected to Flask server for frame streaming.');
+        };
+
+        eventSource.onmessage = function(event) {
+            try {
+                const frames = JSON.parse(event.data);
+                console.log('Received frames update:', frames);
+
+                if (Object.keys(frames).length > 0) {
+                    noFramesMessage.style.display = 'none'; // Hide message if frames exist
+                } else {
+                    noFramesMessage.style.display = 'block'; // Show message if no frames
+                }
+
+                // Get current IDs on the page to determine which to remove
+                const currentDisplayedIdentifiers = new Set();
+                framesGrid.querySelectorAll('.participant-card').forEach(card => {
+                    currentDisplayedIdentifiers.add(card.dataset.identifier);
+                });
+
+                // Iterate over the received frames and update/create cards
+                for (const identifier in frames) {
+                    const frameData = frames[identifier];
+                    const imageData = frameData.image_data;
+                    const participantName = frameData.name; // Use the name directly
+
+                    let participantCard = document.querySelector(`.participant-card[data-identifier="${identifier}"]`);
+
+                    if (!participantCard) {
+                        // Create new card if it doesn't exist
+                        participantCard = document.createElement('div');
+                        participantCard.className = 'participant-card';
+                        participantCard.dataset.identifier = identifier; // Store identifier for easy lookup
+
+                        const img = document.createElement('img');
+                        img.alt = `Participant ${participantName}`;
+                        img.src = imageData;
+                        img.onerror = () => {
+                            img.src = 'https://placehold.co/280x200/cccccc/333333?text=No+Image'; // Placeholder on error
+                            console.error(`Failed to load image for ${identifier}`);
+                        };
+
+                        const p = document.createElement('p');
+                        p.className = 'participant-name'; // Add a class for easier targeting
+                        p.textContent = participantName;
+
+                        participantCard.appendChild(img);
+                        participantCard.appendChild(p);
+                        framesGrid.appendChild(participantCard);
+                    } else {
+                        // Update existing card's image source and name
+                        const img = participantCard.querySelector('img');
+                        if (img.src !== imageData) { // Only update if data has changed
+                            img.src = imageData;
+                        }
+                        const p = participantCard.querySelector('.participant-name');
+                        if (p && p.textContent !== participantName) {
+                            p.textContent = participantName;
+                        }
+                    }
+                    currentDisplayedIdentifiers.delete(identifier); // Mark as processed
+                }
+
+                // Remove cards for participants no longer present in the `frames` object
+                // (i.e., those whose `last_seen` timestamp in Flask has expired)
+                currentDisplayedIdentifiers.forEach(identifier => {
+                    const cardToRemove = document.querySelector(`.participant-card[data-identifier="${identifier}"]`);
+                    if (cardToRemove) {
+                        cardToRemove.remove();
+                        console.log(`Removed stale card for: ${identifier}`);
+                    }
+                });
+
+            } catch (e) {
+                console.error('Error parsing SSE message:', e);
+                showMessage('Error receiving frame data. Check console.', 5000);
+            }
+        };
+
+        eventSource.onerror = function(err) {
+            console.error('SSE EventSource failed:', err);
+            eventSource.close();
+            showMessage('Disconnected from Flask server. Please restart Flask app.', 0); // Show indefinitely
+        };
+    </script>
+</body>
+</html>
